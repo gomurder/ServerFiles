@@ -1,10 +1,10 @@
 var express = require('express');
 var app = express();
-var sunucu = app.listen('3000');
+var sunucu = app.listen('4000');
 var io = require('socket.io').listen(sunucu);
 var yol = require('path');
 var shortid = require('shortid');
-var mysql = require('mysql');
+//var mysql = require('mysql');
 
 var roomNum;
   var playerCount = 0;
@@ -12,18 +12,24 @@ io.on('connection',function(socket){
 	var thisClientId = shortid.generate();
 	//socket.emit("yourid",thisClientId);
 	//socket.emit(thisClientId,"spawn");
-	socket.broadcast.emit('spawn',{id:thisClientId});
+	
 	playerCount++;
 	console.log("Bağlantı Sağlandı, Oyuncu sayısı = ",playerCount);
+/*	socket.broadcast.emit('spawn',{id:thisClientId});
 	for(i = 0; i < playerCount; i++)
 	{
 		socket.emit('spawn',{id:thisClientId});
 		console.log(thisClientId," Oyuncusu Spawnlandı");
-	}
+	}*/
 
 	socket.on('move',function(data){
 		socket.broadcast.emit('FirstMove',data);
 	});
+
+	socket.on('action',function(data){
+		console.log("action data:  ",data);
+	});
+
 	socket.on('spawn',function(data){
 		console.log("Oyuncu Spawnlanıyor");
 	});
