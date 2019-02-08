@@ -6,15 +6,12 @@ var yol = require('path');
 var shortid = require('shortid');
 var mysql = require('mysql');
 
-var con = mysql.createConnection({
-	host: "localhost",
-	user: "root",
-	password: "",
-	database: "nodejs"
-  });
+var roomNum;
   var playerCount = 0;
 io.on('connection',function(socket){
 	var thisClientId = shortid.generate();
+	//socket.emit("yourid",thisClientId);
+	//socket.emit(thisClientId,"spawn");
 	socket.broadcast.emit('spawn',{id:thisClientId});
 	playerCount++;
 	console.log("Bağlantı Sağlandı, Oyuncu sayısı = ",playerCount);
@@ -31,6 +28,11 @@ io.on('connection',function(socket){
 		console.log("Oyuncu Spawnlanıyor");
 	});
 	
+	socket.on('findMatch',function(callback){
+		console.log(roomNum);
+
+	});
+
 	socket.on('ReadyBoost',function(data){
 		socket.broadcast.emit('FirstBoost');
 	});
@@ -45,4 +47,19 @@ io.on('connection',function(socket){
 	});
 
 });
+
+//io.sockets.on('123').emit('roomMessage','merhaba kardşeim oldu galiba');
+//io.sockets.on('123',function(cb){console.log("selam kankaa");});
+
+  /*socket.on("joinRoom", room => {
+	console.log("Joining Room...: " + room);
+	if (registeredRooms.includes(room)) {
+	  //Socket has joined the request room
+	  return socket.emit("success", "Invalid Room Name: " + room);
+	} else {
+	 //No room with the specified Name! (or it could be another reason).
+	 return socket.emit("err", "Invalid Room Name: " + room);
+	}
+  });*/
+
 console.log("Sunucu Aktif");
