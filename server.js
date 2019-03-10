@@ -4,11 +4,13 @@ var sunucu = app.listen('4567');
 var io = require('socket.io').listen(sunucu);
 
 console.log("sunucu aktif");
-
+var connectedPlayers =0;
 io.on('connection',function(socket){
-
-    console.log("birileri bağlandı :/");
-
+    connectedPlayers++;
+    console.log("Bağlantı Sağlandı, Online " , connectedPlayers, " Kişi var.");
+    for(var i = 0; i<1;i++){
+        socket.emit('spawn');
+    }
     socket.on('FirstMove',function(data){
         socket.broadcast.emit('move',data);
     });
@@ -18,6 +20,9 @@ io.on('connection',function(socket){
     });
 
     socket.on('BallMove',function(data){
+        socket.broadcast.emit('BallMoving',data);
+    });
+    socket.on('goal',function(data){
         socket.broadcast.emit('BallMoving',data);
     });
     //  FirstReppingBall
