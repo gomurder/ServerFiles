@@ -21,6 +21,20 @@ var users = {
     "score":10
 }
 
+connection.query('SELECT *FROM userList WHERE username = "isframe"',function(error,results,fields){
+    if(error){
+        console.log('error');
+        return;
+    }
+    else{
+        var tt = [];
+        //tt = JSON.parse(results);
+        tt.push(results[0].friends);
+        //tt.slice(",");
+        console.log(tt);
+    }
+});
+
 /*connection.query('INSERT INTO userList SET ?',users,function(error,results,fields){
     if(error){
         console.log("anaskm");
@@ -38,20 +52,61 @@ io.on('connection',function(socket){
 	io.to(thisClientId).emit('merhaba',{"id":thisClientId});
     socket.leave();*/
 
+    socket.on('Register',function(data){
+        dataUser = {
+            "username":data["username"],
+            "password":data["password"],
+            "email":data["email"],
+            "score":0
+        }
+        connection.query('SELECT * FROM userList WHERE username = ?',dataUser.username,function(error,results,fields)
+        {
+
+            if(results.length > 0){
+                console.log("register is returns some errors");
+            }else{
+                    connection.query('INSERT INTO userList SET ?',dataUser,function(error,results,fields){
+                    if(error)
+                    {
+                        var tickName = shortid.generate();
+                        socket.join(tickName);
+                        io.to(tickName).emit('RegisterError');
+                        socket.leave();
+                        console.log('error to register');
+                    }
+                    else{
+                        var tickName = shortid.generate();
+                        socket.join(tickName);
+                        io.to(tickName).emit('LoginSuccess',{"username":username,"password":password});
+                        socket.leave();
+                        console.log('registered user.');
+                    }
+                    });
+                }
+    });
+
+    });
+
     socket.on('Login',function(data){
 
         var username = data["username"];
         var password = data["password"];
         connection.query('SELECT * FROM userList WHERE username = ? AND password = ?', [username, password], function(error, results, fields) {
 			if (results.length > 0) {
+                socket.join(username);
+                io.to(username).emit('LoginSuccess',{"username":username,"password":password});
+                socket.leave();
 				console.log("giriş yapıldı");
 			} else {
+                var tickName = shortid.generate();
+                socket.join(tickName);
+                io.to(tickName).emit('LoginError');
 				console.log("kullanıcı adı ya da şifre yanlış!");
 			}			
 		});
     });
 
-    socket.on('UpdateData',function(data){
+    socket.on('UpdateScore',function(data){
         let datas =[data["score"],data["username"]];
         connection.query('UPDATE userlist SET score = ? WHERE username = ?',datas,function(error,results,fields){
             if(error){
@@ -62,6 +117,51 @@ io.on('connection',function(socket){
             }
         });
 
+    });
+
+    socket.on("FindPlayer",function(data){
+
+        var myusername = data["myusername"];
+        var username = data["username"];
+        connection.query('SELECT *FROM userList WHERE username = ?',username,function(error,results,fields){
+            if(error){
+                console.log("error!");
+            }
+            else{
+                var friends = [];
+                friends.push(results[0].friends);
+                socket.join(myusername);
+                io.to(myusername).emit('FindedPlayer',{"friends":friends});
+                socket.leave();
+            }
+        });
+
+    });
+
+    socket.on('AddFriend',function(data){
+
+        var addUser = data["remoteUser"];
+        var username = data["username"];
+        connection.query('UPDATE')
+
+    });
+
+    socket.on('ListFriends',function(data){
+        var username = data["username"];
+        connection.query('SELECT *FROM userList WHERE username = ?',username,function(error,results,fields){
+            if(error){
+                console.log('error to listing friends');
+            }
+            else{
+                var friend = [];
+                socket.leave();
+                friend.push(results[0].friends);
+                socket.join(username);
+                var len = friend.length;
+                io.to(username).emit('ListFriendsSuccess',{"friends":friend,"count":friend.length});
+                console.log(friend);
+            }
+        });
     });
     
     socket.on('QuickMatch',function(data){
