@@ -10,9 +10,9 @@ var PlayingRooms = [];
 
 var connection = mysql.createConnection({
 	host     : '127.0.0.1',
-	user     : 'user1',
-	password : '3scapeacc1dent',
-	database : 'static'
+	user     : '',
+	password : '',
+	database : ''
 });   
 
 console.log("sunucu aktif");
