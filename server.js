@@ -53,7 +53,7 @@ io.on('connection',function(socket){
           };
           
           var message = { 
-            app_id: "83ba78aa-e704-4392-a2f8-bbc0b235632d",
+            app_id: "83ba78aa-e704-4392-a2f8-",
             contents: {"en": "test",
         "tr":"Static Apps iyi oyunlar diler"},
             include_player_ids: [idlist]
