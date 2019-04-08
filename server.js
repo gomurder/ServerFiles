@@ -8,6 +8,36 @@ var mysql = require('mysql');
 var WaitingRooms = [];
 var PlayingRooms = [];
 
+var sendNotification = function(data) {
+    var headers = {
+      "Content-Type": "application/json; charset=utf-8"
+    };
+    
+    var options = {
+      host: "onesignal.com",
+      port: 443,
+      path: "/api/v1/notifications",
+      method: "POST",
+      headers: headers
+    };
+    
+    var https = require('https');
+    var req = https.request(options, function(res) {  
+      res.on('data', function(data) {
+        console.log("Response:");
+        console.log(JSON.parse(data));
+      });
+    });
+    
+    req.on('error', function(e) {
+      console.log("ERROR:");
+      console.log(e);
+    });
+    
+    req.write(JSON.stringify(data));
+    req.end();
+  };
+
 var connection = mysql.createConnection({
 	host     : '127.0.0.1',
 	user     : '',
@@ -22,35 +52,7 @@ io.on('connection',function(socket){
       socket.on('testpush',function(callback){
           var idlist = callback["id"];
         idlist = idlist.replace(/['"]+/g, '');
-        var sendNotification = function(data) {
-            var headers = {
-              "Content-Type": "application/json; charset=utf-8"
-            };
-            
-            var options = {
-              host: "onesignal.com",
-              port: 443,
-              path: "/api/v1/notifications",
-              method: "POST",
-              headers: headers
-            };
-            
-            var https = require('https');
-            var req = https.request(options, function(res) {  
-              res.on('data', function(data) {
-                console.log("Response:");
-                console.log(JSON.parse(data));
-              });
-            });
-            
-            req.on('error', function(e) {
-              console.log("ERROR:");
-              console.log(e);
-            });
-            
-            req.write(JSON.stringify(data));
-            req.end();
-          };
+        
           
           var message = { 
             app_id: "83ba78aa-e704-4392-a2f8-",
@@ -72,7 +74,7 @@ io.on('connection',function(socket){
             "friend_request":""
         }
         console.log(dataUser);
-        connection.query('SELECT * FROM userList WHERE username = ?',dataUser.username,function(error,results,fields)
+        connection.query('SELECT * FROM userlist WHERE username = ?',dataUser.username,function(error,results,fields)
         {
 
             if(results.length > 0){
@@ -83,15 +85,14 @@ io.on('connection',function(socket){
                     {
                         var tickName = shortid.generate();
                         socket.join(tickName);
-                        io.to(tickName).emit('RegisterError');
+                        socket.to(tickName).emit('RegisterError');
                         socket.leave();
                         console.log('error to register');
                     }
                     else{
                         var tickName = shortid.generate();
                         socket.join(tickName);
-                        io.to(tickName).emit('LoginSuccess',{"username":username,"password":password});
-                        socket.leave();
+                        socket.to(tickName).emit('LoginSuccess',{"username":username,"password":password});
                         console.log('registered user.');
                     }
                     });
@@ -100,33 +101,22 @@ io.on('connection',function(socket){
 
     });
 
-    socket.on('ResumeGame',function(data){
-        clearInterval(intval);
-        io.to(data["name"]).emit('GameResumed');
-    });
-    var intval;
-    socket.on('StopGame',function(data){
-       
-        intval = setInterval(() => {
-            io.to(data["name"]).emit('kalanzaman');
-          }, 1000);
-
-    });
+    
     
     socket.on('Login',function(data){
 
         var username = data["username"];
         var password = data["password"];
-        connection.query('SELECT * FROM userList WHERE username = ? AND password = ?', [username, password], function(error, results, fields) {
+        connection.query('SELECT * FROM userlist WHERE username = ? AND password = ?', [username, password], function(error, results, fields) {
 			if (results.length > 0) {
                 socket.join(username);
-                io.to(username).emit('LoginSuccess',{"username":username,"password":password});
-                socket.leave();
+                console.log(username);
+                socket.to(username).emit('LoginSuccess',{"username":username,"password":password});
 				console.log("giriş yapıldı");
 			} else {
                 var tickName = shortid.generate();
                 socket.join(tickName);
-                io.to(tickName).emit('LoginError');
+                socket.to(tickName).emit('LoginError');
 				console.log("kullanıcı adı ya da şifre yanlış!");
 			}			
 		});
@@ -169,7 +159,7 @@ io.on('connection',function(socket){
     socket.on('AddFriend',function(data){
         var username = data["username"];
         var myusername = data["myusername"];
-        var datas = [mysuername,username];
+        var datas = [myusername,username];
         console.log(datas);
         connection.query('UPDATE userlist SET friend_request = ? WHERE username = ?',datas,function(error,results,fields){
             if(error){
@@ -177,12 +167,72 @@ io.on('connection',function(socket){
             }else{
                 console.log("kullanıcıya istek gönderildi");
                 socket.join(myusername);
-                io.to(myusername).emit('AddFriendSuccess',{"username":username});
+                socket.to(myusername).emit('AddFriendSuccess',{"username":username});
                 socket.leave();
             }
         });
+    });
+
+    socket.on('AcceptFriend',function(data){
+
+        var myusername = data["myusername"];
+        var username = data["username"];
+        var oldfriends = [];
+        var oldrequests = [];
+        let datas = [oldfriends,oldrequests,username];
+        console.log(datas);
+        connection.query('SELECT *FROM userlist WHERE username = ?',username,function(error,results,fields){
+            if(error){
+                console.log('error oldu knk');
+            }else{
+                
+            
+            oldfriends.push(results.friends);
+            if(oldfriends.indexOf(username) == null){
+                return;
+            }
+            oldrequests.push(results.friend_request);
+            if(oldrequests.indexOf(username) != null){
+                var rindex = oldrequests.indexOf(username);
+                oldrequests.splice(rindex,1);
+                connection.query('UPDATE friends = ?, friend_request = ? FROM userlist WHERE username = ?',datas,function(error,results,fields){
+                    if(error){
+                        console.log('update hata verdi');
+                    }else{
+                        console.log('gayet başarılı');
+                    }
+                });
+            }
+            else{
+                console.log("null falan filasn işte hata");
+            }
+            }
+        });
+        
+    });
+
+    
+    socket.on('PlayWithFriend',function(data){
+        var username = data["username"];
+        console.log('sss');
+        socket.join(username);
+        socket.broadcast.to(username).emit('PlayRequest',{"username":username});
+    });
+    
+    socket.on('ResumeGame',function(data){
+        clearInterval(intval);
+        io.to(data["name"]).emit('GameResumed');
+    });
+    var intval;
+    socket.on('StopGame',function(data){
+       
+        intval = setInterval(() => {
+            socket.to(data["name"]).emit('kalanzaman');
+          }, 1000);
 
     });
+
+
 
     socket.on('ListFriends',function(data){
         var username = data["username"];
@@ -193,9 +243,9 @@ io.on('connection',function(socket){
             else{
                 var friend = [];
                 friend.push(results[0].friends);
+                var katil = shortid.generate();
                 socket.join(username);
-                var len = friend.length;
-                io.to(username).emit('ListFriendsSuccess',{"friends":friend,"count":friend.length});
+                socket.emit((username,'ListFriendsSuccess',{"friends":friend}));
                 console.log(friend);
             }
         });
@@ -207,17 +257,21 @@ io.on('connection',function(socket){
 			console.log("Odaya Katılıyoruz");
 			var quickRoom = WaitingRooms[Math.floor(Math.random()*WaitingRooms.length)];
             socket.join(quickRoom);
+            console.log(quickRoom);
             //socket.to(quickRoom).emit('roomNum',{"roomNo":quickRoom});
             io.to(quickRoom).emit('MatchFind',{"roomNum":quickRoom});
-            socket.leave();
             console.log("girdiğiniz oda: ",quickRoom);
+            var qindex = WaitingRooms.indexOf(quickRoom);
+            WaitingRooms.splice(qindex,1);
+            PlayingRooms.push(quickRoom);
+            console.log("waitin: ",WaitingRooms);
+            console.log("playin: ",PlayingRooms);
 		}
 		else{
             var name = shortid.generate();
 			WaitingRooms.push(name);
             socket.join(name);
             io.to(name).emit('MatchCreated',{"roomNum":name});
-            socket.leave();
             console.log("bekleyen kişi yok, kurulan oda: ",name);
 		//console.log(WaitingRooms.length);
         }
@@ -248,9 +302,15 @@ io.on('connection',function(socket){
     
     socket.on('Quiting',function(data){
         var name = data["name"];
-        var thisDex = PlayingRooms.indexOf(name);
+        if(WaitingRooms.indexOf(name) != null){
+            var waitDex = WaitingRooms.indexOf(name);
+            WaitingRooms.splice(waitDex,1);
+        }
+        if(PlayingRooms.indexOf(name)!=null){
+            var thisDex = PlayingRooms.indexOf(name);
+            PlayingRooms.splice(thisDex,1);
+        }
         socket.leave(PlayingRooms[name]);
-        PlayingRooms.splice(thisDex,1);
         socket.broadcast.to(data["name"]).emit('exLove',data);
     });
 
