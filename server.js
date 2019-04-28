@@ -1,9 +1,63 @@
 var express = require('express');
 var app = express();
+//var Stopwatch = require('node-stopwatch').Stopwatch;
 var sunucu = app.listen('3000');
-var io = require('socket.io').listen(sunucu);
-var shortid = require('shortid');
+var io = require('socket.io').listen(sunucu,{
+    'pingInterval': 2000,
+    'pingTimeout': 5000
+});
 var mysql = require('mysql');    
+/*
+var stopwatch = Stopwatch.create();
+stopwatch.start();
+console.log("ticks: " , stopwatch.elapsedTicks);
+console.log("miliseconds: " , stopwatch.elapsedMilliseconds);
+console.log("seconds: " , stopwatch.elapsed.seconds);
+console.log("minutes: " , stopwatch.elapsed.minutes);
+console.log("hours: " , stopwatch.elapsed.hours);*/
+var Character = function(username)
+{
+    this.id = username;
+	this.speed = 1000;
+	this.positionBuffer = [];
+    this.positionBufferLimit = 1000;
+    
+    this.getLastPosition = function()
+    {
+       return this.positionBuffer[0];
+    }
+
+    this.validatePosition = function(data, deltaTime)
+    {
+        var isNull = this.getLastPosition();
+        
+        var deltaX = data["posx"];
+        var deltaY = data["posy"];
+        
+        var normalizedX = deltaX / (this.speed * deltaTime);
+        var normalizedY = deltaY / (this.speed * deltaTime);
+        
+        var magnitude = Math.sqrt( Math.pow(normalizedX, 2) + Math.pow(normalizedY, 2) );
+
+        
+        if( (magnitude >= 0.990 && magnitude <= 1.001) || (magnitude >= -0.001 && magnitude <= 0.001))
+            return true;
+        else
+            return false;
+    }
+    
+    this.setNewPosition = function(data)
+    {
+        this.positionBuffer.push({x:data["posx"], y:data["posy"]});
+        if(this.positionBuffer.length >= this.positionBufferLimit)
+        {
+            console.log("setnewpos basladi");
+            var savedPositions = this.positionBuffer.slice(1, this.positionBuffer.length);
+            this.positionBuffer = savedPositions;
+            console.log("setnew position bitti");
+        }
+    }
+}
 
 var WaitingRooms = [];
 var PlayingRooms = [];
@@ -40,17 +94,31 @@ var sendNotification = function(data) {
 
 var connection = mysql.createConnection({
 	host     : '127.0.0.1',
-	user     : '',
+	user     : 'root',
 	password : '',
-	database : ''
+	database : 'static'
 });   
-
 var clients = [];
 
 console.log("sunucu aktif");
 var connectedPlayers =0;
 io.sockets.on('connection',function(socket){
-              
+    socket.on('TestForce',function(data){
+        setInterval(() => {
+            console.log('withterwal');
+            socket.emit('withterwal');
+        }, 40);
+    });
+    socket.on('withterwal',function(data){
+        for(var i = 0; i < 50; i++){
+            console.log("sending, datenow: ",Date.now());
+                socket.emit('ASASFfsasafs');
+            }
+    });
+socket.on('ping', function(ms){
+    socket.emit('pong');
+});
+
    console.log(WaitingRooms, " ", PlayingRooms);
 
     socket.on('OpenedNotification',function(data){
@@ -87,11 +155,6 @@ io.sockets.on('connection',function(socket){
             }else{
                 console.log("select basarili");
                 var result_notif = results[0].notification_id;
-                if(result_notif == ''){
-                    console.log("arkadasi begenmedik ", result_notif);
-                    return;
-                }
-                result_notif.toString().replace(/['"]+/g, '');
                 notification.toString().replace(/['"]+/g, '');
                 console.log("1");
                 if(result_notif == notification) {
@@ -122,7 +185,7 @@ io.sockets.on('connection',function(socket){
         
           
           var message = { 
-            app_id: "83ba78aa-e704-4392-a2f8-bbc0b",
+            app_id: "83ba78aa-e704-4392-a2f8-bbc0b235632d",
             subtitle:subtit,
             contents: {"en": enmsg,
             "tr":trmsg},
@@ -163,8 +226,12 @@ io.sockets.on('connection',function(socket){
             "username":data["username"],
             "password":data["password"],
             "email":data["email"],
-            "score":0,
-            "friends":""
+            "friends":"",
+            "friend_request":"",
+            "gold":0,
+            "diamond":0,
+            "notification_id":data["not_id"],
+            "active":"true"
         }
         console.log(dataUser);
         connection.query('SELECT * FROM userlist WHERE username = ?',dataUser.username,function(error,results,fields)
@@ -363,20 +430,32 @@ io.sockets.on('connection',function(socket){
 
     socket.on('ListFriends',function(data){
         var username = data["username"];
-        connection.query('SELECT *FROM userList WHERE username = ?',username,function(error,results,fields){
+        connection.query('SELECT *FROM userlist WHERE username = ?',username,function(error,results,fields){
+            var isActive = [];
             if(error){
                 console.log('error to listing friends');
             }
             else{
                 var friend = [];
+                
                 friend.push(results[0].friends);
-                socket.join(username);
-                io.sockets.to(username).emit('ListFriendsSuccess',{"friends":friend});
-                if(clients[username] == null){
-                    console.log("clients username null verdilaaan");
+                var splitFriend=[];
+                splitFriend= friend[0].split(",");
+                console.log(splitFriend.length," asfasfasffas ", splitFriend[1]);
+                for (var i = 0; i < splitFriend.length; i++){
+                    console.log("lanfor ", i);
+                    connection.query('SELECT *FROM userlist WHERE username =?',splitFriend[i],function(error,sresults,fields){
+                        isActive.push(sresults[0].active.toString());
+                        console.log("geliyorr ",isActive);
+                        io.sockets.to(socket.id).emit('ListFriendsSuccess',{"friends":friend,"active":isActive});
+                        console.log("isactive: ",isActive);
+                });
                 }
-                console.log(friend);
+                console.log("bitti");
+               
+                
             }
+            console.log("yeni ", isActive);
         });
     });
     
@@ -389,6 +468,8 @@ io.sockets.on('connection',function(socket){
             console.log(quickRoom);
             //socket.to(quickRoom).emit('roomNum',{"roomNo":quickRoom});
             io.sockets.to(quickRoom).emit('MatchFind',{"roomNum":quickRoom});
+            socket.broadcast.to(quickRoom).emit('UsernameForMatch',{"username":username});
+            io.sockets.to(socket.id).emit('UsernameForMatch',{"username":quickRoom});
             console.log("girdiğiniz oda: ",quickRoom);
             var qindex = WaitingRooms.indexOf(quickRoom);
             WaitingRooms.splice(qindex,1);
@@ -399,10 +480,26 @@ io.sockets.on('connection',function(socket){
 		else{
 			WaitingRooms.push(username);
             socket.join(username);
-            io.sockets.to(username).emit('MatchCreated',{"roomNum":name});
-            console.log("bekleyen kişi yok, kurulan oda: ",name);
+            io.sockets.to(username).emit('MatchCreated',{"roomNum":username});
+            console.log("bekleyen kişi yok, kurulan oda: ",username);
 		//console.log(WaitingRooms.length);
         }
+    });
+
+    socket.on('CheckLogged',function(data){
+        var username = data["username"];
+        var password = data["password"];
+        let datas = [username,password];
+        connection.query('SELECT *FROM userlist WHERE username = ? AND password = ?',datas,function(error,results,fields){
+            if(error){
+                io.sockets.to(socket.id).emit('CheckingLoggedisFailed');
+            }
+            else{
+                var gold = results[0].gold;
+                var diamond = results[0].diamond;
+                io.sockets.to(socket.id).emit('CheckingLoggedisSuccess',{"username":username,"password":password,"gold":gold,"diamond":diamond});
+            }
+        });
     });
 
     connectedPlayers++;
@@ -429,9 +526,46 @@ io.sockets.on('connection',function(socket){
         socket.broadcast.to(data["from"]).emit('TeamSelected',data);
     });
 
-    socket.on('FirstMove',function(data){
-        socket.broadcast.to(data["from"]).emit('move',data);
+    socket.on('FidrstMove',function(data){
+        console.log(data);
+        var newdata = {
+            "x": data["posx"],
+            "y": data["posy"]
+        }
+        socket.broadcast.to(data["from"]).emit('move',newdata);
     });
+
+    socket.on('FirstMove', function(data)
+	{
+		var roomName = data["from"];
+            var character = new Character(roomName);
+		
+			var deltaTime = 0.02;
+	        var newCharacterState = {};
+            var isNewPositionValid = character.validatePosition(data, deltaTime);
+            
+
+            if(isNewPositionValid)
+            {
+                character.setNewPosition(data);
+                newCharacterState = {x: data["posx"], y: data["posy"]};
+                console.log("new postiion is valid");
+            	socket.broadcast.to(roomName).emit('move', newCharacterState);
+            }
+            else
+            {
+                character.setNewPosition(data);
+                var def = character.getLastPosition();
+                if(def == undefined) return;
+                newCharacterState = {
+                    x: def.x,
+                    y: def.y
+                };
+
+                socket.broadcast.to(roomName).emit('move', newCharacterState);
+            	io.sockets.to(socket.id).emit('meMove', newCharacterState);                
+            }
+        });
 
     socket.on('sendgoal',function(data){
         io.sockets.to(data["from"]).emit('goal',data);
