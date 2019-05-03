@@ -4,7 +4,7 @@ var app = express();
 var sunucu = app.listen('3000');
 var io = require('socket.io').listen(sunucu);
 var shortid = require('shortid');
-//var mysql = require('mysql');    
+var mysql = require('mysql');    
 /*
 var stopwatch = Stopwatch.create();
 stopwatch.start();
@@ -585,15 +585,34 @@ socket.on('bifortest',function(data){
     });
 
     socket.on('BallMove',function(data){
-        socket.broadcast.to(data["from"]).emit('BallMoving',data);
+        let datas = {
+            "rep":"",
+            "posx":data["posx"],
+            "posy":data["posy"],
+            "velx":data["velx"],
+            "vely":data["vely"],
+        }
+        socket.broadcast.to(data["from"]).emit('BallMoving',datas);
+        datas.rep = "rep";
+        io.sockets.to(socket.id).emit('BallMoving',datas);
     });
 
     socket.on('BallTest',function(data){
-        socket.broadcast.to(data["from"]).emit('testreceive',data);
+        let datas = {
+            "rep":"",
+            "posx":data["posx"],
+            "posy":data["posy"],
+            "velx":data["velx"],
+            "vely":data["vely"],
+            "rotx":data["rotx"]
+        }
+        socket.broadcast.to(data["from"]).emit('testreceive',datas);
+        datas.rep = "rep";
+        io.sockets.to(socket.id).emit('testreceive',datas);
     });
     
     socket.on('Quiting',function(data){
-        var name = data["name"];
+        var name = data["from"];
         if(WaitingRooms.indexOf(name) != null){
             var waitDex = WaitingRooms.indexOf(name);
             WaitingRooms.splice(waitDex,1);
@@ -603,14 +622,28 @@ socket.on('bifortest',function(data){
             PlayingRooms.splice(thisDex,1);
         }
         socket.leave(PlayingRooms[name]);
-        socket.broadcast.to(data["name"]).emit('exLove',data);
+        socket.broadcast.to(data["from"]).emit('exLove',data);
     });
 
     //  FirstReppingBall
     // BallRep
 
     socket.on('BallRep',function(data){
-        socket.broadcast.to(data["from"]).emit('FirstReppingBall',data);
+        let datas = {
+            "rep":"",
+            "posx":data["posx"],
+            "posy":data["posy"],
+            "velx":data["velx"],
+            "vely":data["vely"],
+            "rotx":data["rotx"],
+            "sax":data["sax"],
+            "say":data["say"],
+            "saz":data["saz"],
+            "what":data["what"]
+        }
+        socket.broadcast.to(data["from"]).emit('FirstReppingBall',datas);
+        datas.rep = "rep";
+        io.sockets.to(socket.id).emit('FirstReppingBall',datas);
     });
 
     socket.on('disconnect',function(cb){
