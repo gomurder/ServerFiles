@@ -13,6 +13,7 @@ console.log("miliseconds: " , stopwatch.elapsedMilliseconds);
 console.log("seconds: " , stopwatch.elapsed.seconds);
 console.log("minutes: " , stopwatch.elapsed.minutes);
 console.log("hours: " , stopwatch.elapsed.hours);*/
+
 var Character = function(username)
 {
     this.id = username;
@@ -64,6 +65,8 @@ var pingRates = {
 
 }
 
+
+
 var sendNotification = function(data) {
     var headers = {
       "Content-Type": "application/json; charset=utf-8"
@@ -99,16 +102,128 @@ var connection = mysql.createConnection({
 	user     : 'root',
 	password : '',
 	database : 'static'
-});   
+});
+
+var timerUsers = [["p1",245],["p2",2455]];
+this.testInterval = function(){
+    console.log("asdasd");
+    for(var i = 0; i < timerUsers.length; i++){
+        timerUsers[i][1]--;
+    }
+    io.sockets.emit('Timer',{"timerUsers":timerUsers});
+    console.log(timerUsers);
+};
+
+setInterval(() => {
+    this.testInterval();
+}, 1000);
+
 var pingRates = [];
 var clients = [];
+var newPlayers = [];
+var intvals;
+var inGamePlayers = [];
 console.log("sunucu aktif");
 var connectedPlayers =0;
+var controlled = false;
 io.sockets.on('connection',function(socket){
-    setInterval(() => {
-        var a = Date.now();
-        socket.emit('post',{"a":a});
-    },1000);
+   connectedPlayers++;
+   console.log("Bağlantı Sağlandı, Online " , connectedPlayers, " Kişi var.");
+
+    socket.on('NewMove',function(data){
+        var index = data["index"];
+        console.log(" test move: ", data, " test; ",index);
+        io.sockets.to(index).emit('secondMoving',data);
+    });
+
+    socket.on('Distrube',function(data){
+        
+        connection.query('SELECT *FROM userlist WHERE username = ?',data["username"],function(error,results,fields){
+            var oldg = results[0].gold;
+            let datas = [oldg+4,data["username"]];
+            connection.query('UPDATE userlist SET gold = ? WHERE username = ?',datas,function(error,results,fields){
+                if(error)console.log("error when update win user");
+                else{
+                    console.log("success");
+                }
+            });
+        });
+    });
+
+  /*socket.on('QuickMatch',function(data){
+        var username = data["username"];
+		if(WaitingRooms.length >= 1){
+			console.log("Odaya Katılıyoruz");
+			var quickRoom = WaitingRooms[Math.floor(Math.random()*WaitingRooms.length)];
+            socket.join(quickRoom);
+            console.log(quickRoom);
+            //socket.to(quickRoom).emit('roomNum',{"roomNo":quickRoom});
+            io.sockets.to(quickRoom).emit('MatchFind',{"roomNum":quickRoom});
+            socket.broadcast.to(quickRoom).emit('UsernameForMatch',{"username":username});
+            io.sockets.to(socket.id).emit('UsernameForMatch',{"username":quickRoom});
+            console.log("girdiğiniz oda: ",quickRoom);
+            var qindex = WaitingRooms.indexOf(quickRoom);
+            WaitingRooms.splice(qindex,1);
+            PlayingRooms.push(quickRoom);
+            console.log("waitin: ",WaitingRooms);
+            console.log("playin: ",PlayingRooms);
+		}
+		else{
+			WaitingRooms.push(username);
+            socket.join(username);
+            io.sockets.to(username).emit('MatchCreated',{"roomNum":username});
+            console.log("bekleyen kişi yok, kurulan oda: ",username);
+		//console.log(WaitingRooms.length);
+        }
+    });*/
+
+    socket.on('QuickMatch',function(data){
+       // console.log("tuser, ",timerUsers);
+        var username = data["username"];
+        //if(WaitingRooms.indexOf(username) != null||PlayingRooms.indexOf(username)!=null)return;
+		if(WaitingRooms.length >= 1){
+			console.log("Odaya Katılıyoruz");
+            var quickRoom = WaitingRooms[Math.floor(Math.random()*WaitingRooms.length)];
+            socket.join(quickRoom);
+            console.log(quickRoom);
+            //socket.to(quickRoom).emit('roomNum',{"roomNo":quickRoom});
+            io.sockets.to(quickRoom).emit('MatchFind',{"roomNum":quickRoom});
+            io.sockets.to(socket.id).emit('youJoined');
+            socket.broadcast.to(quickRoom).emit('UsernameForMatch',{"username":username});
+            io.sockets.to(socket.id).emit('UsernameForMatch',{"username":quickRoom});
+            console.log("girdiğiniz oda: ",quickRoom);
+            var qindex = WaitingRooms.indexOf(quickRoom);
+            WaitingRooms.splice(qindex,1);
+            PlayingRooms.push(quickRoom);
+            console.log("waitin: ",WaitingRooms);
+            console.log("playin: ",PlayingRooms);
+            timerUsers.push([quickRoom,130]);   
+		}
+		else{
+            console.log("else");
+			WaitingRooms.push(username);
+            socket.join(username);
+            io.sockets.to(socket.id).emit('MatchCreated',{"roomNum":username});
+            console.log("bekleyen kişi yok, kurulan oda: ",username, " asfsaf : ",timerUsers);
+            console.log("ardsein ", timerUsers);         
+		//console.log(WaitingRooms.length);
+        }
+    });
+
+    var test = [["ozan","enessedef"],["osenyurt"]];
+    var b = test.indexOf(["ozan"]);
+    for(var i = 0; i < test.length; i++){
+        if(test[i][0] == "osenyurt"){
+            console.log(test[i][0], " spliced");
+            //test.splice(test[i][0],1);
+            test[i] = [test[i][1]];
+            console.log(test, " le: ", test[i].length);
+        }
+    }
+
+    socket.on('pingest',function(data){
+        io.sockets.to(socket.id).emit('')
+    });
 
     socket.on('postreceive',function(data){
         var d = new Date();
@@ -462,51 +577,21 @@ socket.on('bifortest',function(data){
                 splitFriend= friend[0].split(",");
                 console.log(splitFriend.length," asfasfasffas ", splitFriend[1]);
                 for (var i = 0; i < splitFriend.length; i++){
-                    console.log("lanfor ", i);
                     connection.query('SELECT *FROM userlist WHERE username =?',splitFriend[i],function(error,sresults,fields){
                         isActive.push(sresults[0].active.toString());
-                        console.log("geliyorr ",isActive);
                         io.sockets.to(socket.id).emit('ListFriendsSuccess',{"friends":friend,"active":isActive});
-                        console.log("isactive: ",isActive);
                 });
                 }
-                console.log("bitti");
                
                 
             }
-            console.log("yeni ", isActive);
         });
     });
     
-    socket.on('QuickMatch',function(data){
-        var username = data["username"];
-		if(WaitingRooms.length >= 1){
-			console.log("Odaya Katılıyoruz");
-			var quickRoom = WaitingRooms[Math.floor(Math.random()*WaitingRooms.length)];
-            socket.join(quickRoom);
-            console.log(quickRoom);
-            //socket.to(quickRoom).emit('roomNum',{"roomNo":quickRoom});
-            io.sockets.to(quickRoom).emit('MatchFind',{"roomNum":quickRoom});
-            socket.broadcast.to(quickRoom).emit('UsernameForMatch',{"username":username});
-            io.sockets.to(socket.id).emit('UsernameForMatch',{"username":quickRoom});
-            console.log("girdiğiniz oda: ",quickRoom);
-            var qindex = WaitingRooms.indexOf(quickRoom);
-            WaitingRooms.splice(qindex,1);
-            PlayingRooms.push(quickRoom);
-            console.log("waitin: ",WaitingRooms);
-            console.log("playin: ",PlayingRooms);
-		}
-		else{
-			WaitingRooms.push(username);
-            socket.join(username);
-            io.sockets.to(username).emit('MatchCreated',{"roomNum":username});
-            console.log("bekleyen kişi yok, kurulan oda: ",username);
-		//console.log(WaitingRooms.length);
-        }
-    });
+    
 
     socket.on('CheckLogged',function(data){
-        /*var username = data["username"];
+        var username = data["username"];
         var password = data["password"];
         let datas = [username,password];
         connection.query('SELECT *FROM userlist WHERE username = ? AND password = ?',datas,function(error,results,fields){
@@ -518,11 +603,8 @@ socket.on('bifortest',function(data){
                 var diamond = results[0].diamond;
                 io.sockets.to(socket.id).emit('CheckingLoggedisSuccess',{"username":username,"password":password,"gold":gold,"diamond":diamond});
             }
-        });*/
+        });
     });
-
-    connectedPlayers++;
-    console.log("Bağlantı Sağlandı, Online " , connectedPlayers, " Kişi var.");
 
     socket.on('Winner',function(data){
         io.sockets.to(data["from"]).emit('WinnerChoosed',data);
@@ -587,6 +669,12 @@ socket.on('bifortest',function(data){
         });
 
     socket.on('sendgoal',function(data){
+        console.log('goal');
+        for(var i =0;i<timerUsers.length;i++){
+            if(timerUsers[i][0]==data["from"]){
+                timerUsers[i][1]+=6;
+            }
+        }
         io.sockets.to(data["from"]).emit('goal',data);
     });
 
@@ -595,30 +683,12 @@ socket.on('bifortest',function(data){
     });
 
     socket.on('BallMove',function(data){
-        let datas = {
-            "rep":"",
-            "posx":data["posx"],
-            "posy":data["posy"],
-            "velx":data["velx"],
-            "vely":data["vely"],
-        }
-        socket.broadcast.to(data["from"]).emit('BallMoving',datas);
-        datas.rep = "rep";
-        io.sockets.to(socket.id).emit('BallMoving',datas);
+        socket.broadcast.to(data["from"]).emit('BallMoving',data);
     });
 
     socket.on('BallTest',function(data){
-        let datas = {
-            "rep":"",
-            "posx":data["posx"],
-            "posy":data["posy"],
-            "velx":data["velx"],
-            "vely":data["vely"],
-            "rotx":data["rotx"]
-        }
-        socket.broadcast.to(data["from"]).emit('testreceive',datas);
-        datas.rep = "rep";
-        io.sockets.to(socket.id).emit('testreceive',datas);
+        console.log("balltest");
+        socket.broadcast.to(data["from"]).emit('testreceive',data);
     });
     
     socket.on('Quiting',function(data){
@@ -631,29 +701,36 @@ socket.on('bifortest',function(data){
             var thisDex = PlayingRooms.indexOf(name);
             PlayingRooms.splice(thisDex,1);
         }
+
         socket.leave(PlayingRooms[name]);
         socket.broadcast.to(data["from"]).emit('exLove',data);
+    });
+
+    socket.on('versesQuit',function(data){
+
+        var creater;
+        var ind = data["index"];
+        var username = data["username"];
+        for(var i =0;i<4;i++){
+            if(newPlayers.length < 1) return;
+            if(newPlayers[ind][i]==username){
+                newPlayers[ind].splice(i,1);
+                creater = newPlayers[ind][0];
+            }
+            if(inGamePlayers[ind][i]==username){
+                inGamePlayers[ind].splice(i,1);
+                creater = inGamePlayers[ind][0];
+            }
+        }
+        socket.leave(creater);
+        io.sockets.to(creater).emit('playerQuited',{"username":username});
     });
 
     //  FirstReppingBall
     // BallRep
 
     socket.on('BallRep',function(data){
-        let datas = {
-            "rep":"",
-            "posx":data["posx"],
-            "posy":data["posy"],
-            "velx":data["velx"],
-            "vely":data["vely"],
-            "rotx":data["rotx"],
-            "sax":data["sax"],
-            "say":data["say"],
-            "saz":data["saz"],
-            "what":data["what"]
-        }
-        socket.broadcast.to(data["from"]).emit('FirstReppingBall',datas);
-        datas.rep = "rep";
-        io.sockets.to(socket.id).emit('FirstReppingBall',datas);
+        socket.broadcast.to(data["from"]).emit('FirstReppingBall',data);
     });
 
     socket.on('disconnect',function(cb){
